@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>海拍客看板</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div>
+          <p class="eyebrow">Hipac Monitoring Board</p>
+          <h1>海拍客看板</h1>
+        </div>
+        <div class="header-actions">
+          <label class="upload-button" for="file-upload">导入周报</label>
+          <input id="file-upload" type="file" accept=".xlsx,.xls,.csv,.json,application/json,text/csv" />
+          <div class="source-meta">
+            <strong id="source-label">示例数据</strong>
+            <span id="record-label">0 条记录</span>
+            <span id="import-status">可导入 xlsx / csv / json</span>
+          </div>
+        </div>
+      </header>
+
+      <section class="toolbar">
+        <label>
+          <span>监测日期</span>
+          <select id="date-filter"></select>
+        </label>
+        <label>
+          <span>品类</span>
+          <select id="category-filter"></select>
+        </label>
+        <button id="reset-filters" type="button">重置</button>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Latest vs Last Week</p>
+            <h2 id="weekly-title">最新日期对比上一整周</h2>
+          </div>
+        </div>
+        <div id="weekly-compare" class="compare-table-wrap"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Fresh Stock Trend</p>
+            <h2>不同品类新鲜货库存与折扣率趋势</h2>
+          </div>
+        </div>
+        <div id="fresh-trend-grid" class="trend-grid"></div>
+      </section>
+
+      <section class="section-block">
+        <div class="section-heading">
+          <div>
+            <p class="section-kicker">Near Expiry Watch</p>
+            <h2>临期货关注</h2>
+          </div>
+        </div>
+        <div id="near-expiry-watch" class="watch-grid"></div>
+      </section>
+    </main>
+
+    <script src="./data.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
