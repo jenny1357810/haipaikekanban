@@ -247,10 +247,10 @@ function renderFreshTrends() {
 function renderWeeklyCompare() {
   const analysisData = getAnalysisData();
   const latestDate = getFocusDate(analysisData);
-  const previousWeekDates = getPreviousWeekDates(latestDate);
+  const previousDate = getPreviousSamePeriodDate(latestDate);
   const latestRows = analysisData.filter((item) => item.date === latestDate && item.isFresh);
-  const previousRows = analysisData.filter((item) => previousWeekDates.includes(item.date) && item.isFresh);
-  els.weeklyTitle.textContent = `${latestDate} 对比上一整周`;
+  const previousRows = analysisData.filter((item) => item.date === previousDate && item.isFresh);
+  els.weeklyTitle.textContent = `${latestDate} 对比上周同期${previousDate ? `（${previousDate}）` : ""}`;
 
   const rows = CATEGORIES.map((category) => {
     const now = summarizeFresh(latestRows.filter((item) => item.category === category));
@@ -264,9 +264,9 @@ function renderWeeklyCompare() {
         <tr>
           <th>品类</th>
           <th>最新库存</th>
-          <th>较上周库存</th>
+          <th>较上周同期库存</th>
           <th>最新平均折扣率</th>
-          <th>较上周折扣率</th>
+          <th>较上周同期折扣率</th>
           <th>最新最低折扣率</th>
           <th>提示</th>
         </tr>
@@ -500,20 +500,12 @@ function summarizeFresh(rows) {
   };
 }
 
-function getPreviousWeekDates(latestDate) {
-  if (!latestDate || latestDate === "-") return [];
+function getPreviousSamePeriodDate(latestDate) {
+  if (!latestDate || latestDate === "-") return "";
   const latest = new Date(`${latestDate}T00:00:00`);
-  const day = latest.getDay() || 7;
-  const thisWeekMonday = new Date(latest);
-  thisWeekMonday.setDate(latest.getDate() - day + 1);
-  const previousMonday = new Date(thisWeekMonday);
-  previousMonday.setDate(thisWeekMonday.getDate() - 7);
-  const previousSunday = new Date(thisWeekMonday);
-  previousSunday.setDate(thisWeekMonday.getDate() - 1);
-  return uniqueValues(getAnalysisData(), "date").filter((date) => {
-    const current = new Date(`${date}T00:00:00`);
-    return current >= previousMonday && current <= previousSunday;
-  });
+  if (Number.isNaN(latest.getTime())) return "";
+  latest.setDate(latest.getDate() - 7);
+  return formatDateParts(latest.getFullYear(), latest.getMonth() + 1, latest.getDate());
 }
 
 function getLatestDate(data) {
