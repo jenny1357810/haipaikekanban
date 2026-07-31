@@ -223,6 +223,11 @@ select {
   color: var(--green);
 }
 
+.tag.warning {
+  background: var(--amber-soft);
+  color: var(--amber);
+}
+
 .metric-pair,
 .watch-grid {
   display: grid;

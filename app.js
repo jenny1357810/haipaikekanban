@@ -13,6 +13,7 @@ const DISCOUNT_AXIS_MIN = 0.3;
 const DISCOUNT_AXIS_MAX = 0.8;
 const VALID_DISCOUNT_MIN = 0.2;
 const VALID_DISCOUNT_MAX = 1;
+const LOW_PRICE_THRESHOLD = 0.6;
 
 const sampleRows = [
   row("2026-04-19", "米粉", "小皮高铁原味有机大米粉160g*48", 1780, 0.571, 64000, "Y", "N", 0, "海拍客"),
@@ -152,7 +153,10 @@ function normalizeRecord(item, index = 0) {
   const category = mapCategory(item["大品类"] || item.category || "");
   const isFresh = toFlag(item["是否新鲜货"] ?? item.isFresh);
   const isNearExpiry = toFlag(item["是否临期"] ?? item.isNearExpiry);
-  const discount = normalizeDiscount(item["到手价折扣率"] ?? item.discount);
+  const rawDiscount = parseDiscount(item["到手价折扣率"] ?? item.discount);
+  const discount = normalizeDiscount(rawDiscount);
+  const isValidDiscount = typeof discount === "number" && Number.isFinite(discount);
+  const isLowPriceFresh = isFresh && isValidDiscount && discount < LOW_PRICE_THRESHOLD;
   const unitCount = toNumber(item["件数"] ?? item.unitCount, 0);
   const stockCount = toNumber(item["库存"] ?? item.stockCount, 0);
   const inferredInventory = stockCount * unitCount;
@@ -167,13 +171,39 @@ function normalizeRecord(item, index = 0) {
     shop: String(item["店铺名称"] || item.shop || ""),
     price: toNumber(item["到手折扣价"] ?? item.price, 0),
     discount,
+    rawDiscount,
     freshInventory: isFresh ? freshInventory : 0,
     nearInventory: isNearExpiry ? nearInventory : 0,
     isFresh,
     isNearExpiry,
+    isMainAnalysis: isLowPriceFresh,
     status: String(item["在架状态"] || item.status || ""),
     link: String(item["链接"] || item.link || ""),
+    flavor: String(item["口味"] || item.flavor || ""),
+    productionDate: String(item["生产日期"] || item.productionDate || ""),
+    warehouse: String(item["发货地址"] || item.warehouse || ""),
   };
+}
+
+function inventoryGroupKey(item) {
+  return [
+    item.date,
+    item.category,
+    item.link,
+    item.flavor,
+    item.productionDate,
+    item.warehouse,
+  ].join("||");
+}
+
+function dedupedInventory(rows, field) {
+  const groups = new Map();
+  rows.forEach((item) => {
+    const key = inventoryGroupKey(item);
+    const value = Number(item[field]) || 0;
+    groups.set(key, Math.max(groups.get(key) || 0, value));
+  });
+  return sum([...groups.values()]);
 }
 
 function populateFilters() {
@@ -213,7 +243,7 @@ function getFiltered() {
 function renderFreshTrends() {
   const analysisData = getAnalysisData();
   els.freshTrendGrid.innerHTML = CATEGORIES.map((category) => {
-    const data = analysisData.filter((item) => item.category === category && item.isFresh);
+    const data = analysisData.filter((item) => item.category === category && item.isMainAnalysis);
     const series = buildCategorySeries(data);
     const latest = series[series.length - 1];
     const target = TARGETS[category];
@@ -247,14 +277,22 @@ function renderFreshTrends() {
 function renderWeeklyCompare() {
   const analysisData = getAnalysisData();
   const latestDate = getFocusDate(analysisData);
-  const previousDate = getPreviousSamePeriodDate(latestDate);
-  const latestRows = analysisData.filter((item) => item.date === latestDate && item.isFresh);
-  const previousRows = analysisData.filter((item) => item.date === previousDate && item.isFresh);
-  els.weeklyTitle.textContent = `${latestDate} 对比上周同期${previousDate ? `（${previousDate}）` : ""}`;
+  const previousDate = getPreviousCollectionDate(analysisData, latestDate);
+  const latestFreshRows = analysisData.filter((item) => item.date === latestDate && item.isFresh);
+  const previousFreshRows = analysisData.filter((item) => item.date === previousDate && item.isFresh);
+  const latestRows = latestFreshRows.filter((item) => item.isMainAnalysis);
+  const previousRows = previousFreshRows.filter((item) => item.isMainAnalysis);
+  els.weeklyTitle.textContent = `${latestDate} 对比上一次采集${previousDate ? `（${previousDate}）` : ""}`;
 
   const rows = CATEGORIES.map((category) => {
-    const now = summarizeFresh(latestRows.filter((item) => item.category === category));
-    const previous = summarizeFresh(previousRows.filter((item) => item.category === category));
+    const now = summarizeFresh(
+      latestRows.filter((item) => item.category === category),
+      latestFreshRows.filter((item) => item.category === category)
+    );
+    const previous = summarizeFresh(
+      previousRows.filter((item) => item.category === category),
+      previousFreshRows.filter((item) => item.category === category)
+    );
     return { category, now, previous };
   });
 
@@ -264,9 +302,9 @@ function renderWeeklyCompare() {
         <tr>
           <th>品类</th>
           <th>最新库存</th>
-          <th>较上周同期库存</th>
+          <th>较上次库存</th>
           <th>最新平均折扣率</th>
-          <th>较上周同期折扣率</th>
+          <th>较上次折扣率</th>
           <th>最新最低折扣率</th>
           <th>提示</th>
         </tr>
@@ -279,6 +317,7 @@ function renderWeeklyCompare() {
           const alerts = [
             now.inventory > target.inventory ? "库存超预期" : "",
             now.discountCount && now.avgDiscount < target.avgDiscount ? "平均折扣低于标准" : "",
+            ...getCompareNotes(now, previous),
           ].filter(Boolean);
           return `
             <tr>
@@ -288,7 +327,7 @@ function renderWeeklyCompare() {
               <td>${now.discountCount ? formatPercent(now.avgDiscount) : "-"}</td>
               <td class="${toneClass(discountDiff, false)}">${now.discountCount && previous.discountCount ? formatSigned(discountDiff, "percent") : "-"}</td>
               <td>${now.discountCount ? formatPercent(now.minDiscount) : "-"}</td>
-              <td>${alerts.length ? alerts.map((text) => `<span class="tag danger">${text}</span>`).join("") : '<span class="tag ok">正常</span>'}</td>
+              <td>${alerts.length ? alerts.map(renderCompareTag).join("") : '<span class="tag ok">正常</span>'}</td>
             </tr>
           `;
         }).join("")}
@@ -303,7 +342,7 @@ function renderNearExpiry() {
   const latestNear = analysisData.filter((item) => item.date === latestDate && item.isNearExpiry);
   const groups = CATEGORIES.map((category) => ({
     category,
-    inventory: sum(latestNear.filter((item) => item.category === category).map((item) => item.nearInventory)),
+    inventory: dedupedInventory(latestNear.filter((item) => item.category === category), "nearInventory"),
     avgDiscount: average(validDiscounts(latestNear.filter((item) => item.category === category).map((item) => item.discount))),
   }));
 
@@ -321,7 +360,7 @@ function buildCategorySeries(data) {
     const discounts = validDiscounts(rows.map((item) => item.discount));
     return {
       date,
-      inventory: sum(rows.map((item) => item.freshInventory)),
+      inventory: dedupedInventory(rows, "freshInventory"),
       avgDiscount: average(discounts),
       minDiscount: minValue(discounts),
       discountCount: discounts.length,
@@ -489,23 +528,45 @@ function escapeAttr(value) {
     .replace(/>/g, "&gt;");
 }
 
-function summarizeFresh(rows) {
+function summarizeFresh(rows, allFreshRows = rows) {
   const discounts = validDiscounts(rows.map((item) => item.discount));
+  const rawDiscounts = allFreshRows.map((item) => item.rawDiscount).filter((value) => Number.isFinite(value));
   return {
-    count: rows.length,
+    count: allFreshRows.length,
+    mainCount: rows.length,
     discountCount: discounts.length,
-    inventory: sum(rows.map((item) => item.freshInventory)),
+    invalidDiscountCount: rawDiscounts.length - discounts.length,
+    inventory: dedupedInventory(rows, "freshInventory"),
     avgDiscount: average(discounts),
     minDiscount: minValue(discounts),
   };
 }
 
-function getPreviousSamePeriodDate(latestDate) {
-  if (!latestDate || latestDate === "-") return "";
-  const latest = new Date(`${latestDate}T00:00:00`);
-  if (Number.isNaN(latest.getTime())) return "";
-  latest.setDate(latest.getDate() - 7);
-  return formatDateParts(latest.getFullYear(), latest.getMonth() + 1, latest.getDate());
+function getCompareNotes(now, previous) {
+  const notes = [];
+  if (!now.count) {
+    notes.push("最新无新鲜货");
+  } else if (!now.mainCount) {
+    notes.push("最新无有效新鲜货");
+  } else if (!now.discountCount && now.invalidDiscountCount) {
+    notes.push("最新折扣异常");
+  } else if (!now.discountCount) {
+    notes.push("最新无有效折扣");
+  }
+
+  if (now.discountCount && !previous.discountCount) {
+    notes.push(previous.count ? "上次无有效新鲜货" : "上次无新鲜货");
+  }
+  return notes;
+}
+
+function renderCompareTag(text) {
+  const isDataNote = text.includes("无") || text.includes("异常");
+  return `<span class="tag ${isDataNote ? "warning" : "danger"}">${text}</span>`;
+}
+
+function getPreviousCollectionDate(data, latestDate) {
+  return uniqueValues(data, "date").sort((a, b) => a.localeCompare(b)).filter((date) => date < latestDate).at(-1) || "";
 }
 
 function getLatestDate(data) {
@@ -550,7 +611,7 @@ function sum(values) {
 }
 
 function average(values) {
-  const valid = values.filter((value) => Number.isFinite(Number(value)));
+  const valid = values.filter((value) => typeof value === "number" && Number.isFinite(value));
   return valid.length ? sum(valid) / valid.length : 0;
 }
 
@@ -587,13 +648,17 @@ function toNumber(value, fallback = 0) {
   return Number.isFinite(number) ? number : fallback;
 }
 
+function parseDiscount(value) {
+  return toNumber(value, NaN);
+}
+
 function normalizeDiscount(value) {
-  const discount = toNumber(value, NaN);
+  const discount = Number(value);
   return discount >= VALID_DISCOUNT_MIN && discount <= VALID_DISCOUNT_MAX ? discount : null;
 }
 
 function validDiscounts(values) {
-  return values.filter((value) => Number.isFinite(Number(value)));
+  return values.filter((value) => typeof value === "number" && Number.isFinite(value));
 }
 
 function toFlag(value) {
