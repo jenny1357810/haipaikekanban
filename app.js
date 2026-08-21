@@ -1,6 +1,7 @@
-const CATEGORIES = ["米粉", "经典果泥", "宝石果泥", "辅食油", "面条"];
+const CATEGORIES = ["PRO米粉", "米粉", "经典果泥", "宝石果泥", "辅食油", "面条"];
 
 const TARGETS = {
+  "PRO米粉": { inventory: 2000, avgDiscount: 0.5 },
   "米粉": { inventory: 15000, avgDiscount: 0.5 },
   "经典果泥": { inventory: 6000, avgDiscount: 0.5 },
   "宝石果泥": { inventory: 2000, avgDiscount: 0.5 },
@@ -587,6 +588,7 @@ function mapCategory(value) {
   const text = String(value || "");
   if (text.includes("宝石")) return "宝石果泥";
   if (text.includes("果泥") || text.includes("辅食泥")) return "经典果泥";
+  if (text.includes("高铁侠") || text.includes("PRO米粉")) return "PRO米粉";
   if (text.includes("米粉")) return "米粉";
   if (text.includes("面")) return "面条";
   if (text.includes("油")) return "辅食油";
