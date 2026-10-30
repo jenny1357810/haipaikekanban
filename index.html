@@ -25,23 +25,22 @@
         </div>
       </header>
 
-      <section class="toolbar">
-        <label>
-          <span>监测日期</span>
-          <select id="date-filter"></select>
-        </label>
-        <label>
-          <span>品类</span>
-          <select id="category-filter"></select>
-        </label>
-        <button id="reset-filters" type="button">重置</button>
-      </section>
-
       <section class="section-block">
         <div class="section-heading">
           <div>
             <p class="section-kicker">Latest vs Last Week</p>
             <h2 id="weekly-title">最新日期对比上周同期</h2>
+            <div class="analysis-scope" role="group" aria-label="新鲜货折扣范围">
+              <span class="tag ok">新鲜货</span>
+              <button type="button" class="scope-tab" data-discount-threshold="0.6" aria-pressed="false">低于6折</button>
+              <button type="button" class="scope-tab" data-discount-threshold="0.8" aria-pressed="true">低于8折</button>
+              <span class="scope-note">不含临界折扣；提示预警固定按低于6折判断</span>
+            </div>
+          </div>
+          <div class="comparison-controls">
+            <label><span>基准日期</span><select id="base-date"></select></label>
+            <label><span>对比日期</span><select id="compare-date"></select></label>
+            <button id="reset-comparison" type="button">重置</button>
           </div>
         </div>
         <div id="weekly-compare" class="compare-table-wrap"></div>
@@ -52,6 +51,12 @@
           <div>
             <p class="section-kicker">Fresh Stock Trend</p>
             <h2>不同品类新鲜货库存与折扣率趋势</h2>
+            <div class="analysis-scope" role="group" aria-label="新鲜货折扣范围">
+              <span class="tag ok">新鲜货</span>
+              <button type="button" class="scope-tab" data-discount-threshold="0.6" aria-pressed="false">低于6折</button>
+              <button type="button" class="scope-tab" data-discount-threshold="0.8" aria-pressed="true">低于8折</button>
+              <span class="scope-note">不含临界折扣；提示预警固定按低于6折判断</span>
+            </div>
           </div>
         </div>
         <div id="fresh-trend-grid" class="trend-grid"></div>

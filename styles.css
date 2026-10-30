@@ -165,6 +165,20 @@ select {
   margin-bottom: 12px;
 }
 
+.comparison-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.comparison-controls label {
+  min-width: 150px;
+}
+
+.comparison-controls button {
+  white-space: nowrap;
+}
+
 .section-heading h2 {
   font-size: 20px;
 }
@@ -542,7 +556,11 @@ th {
     flex-direction: column;
   }
 
-  .toolbar,
+  .comparison-controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
   .trend-grid,
   .metric-pair,
   .metric-triplet,
@@ -550,3 +568,16 @@ th {
     grid-template-columns: 1fr;
   }
 }
+
+.analysis-scope {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.analysis-scope { align-items: center; }
+.scope-tab { padding: 5px 12px; border-radius: 16px; background: white; color: var(--accent); font-size: 13px; }
+.scope-tab[aria-pressed="true"] { background: var(--accent); color: white; }
+.scope-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.scope-note { color: var(--muted); font-size: 12px; }
